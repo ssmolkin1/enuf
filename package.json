@@ -1,0 +1,26 @@
+{
+  "name": "nuf",
+  "version": "1.0.0",
+  "description": "Number files in a folder ",
+  "main": "index.js",
+  "scripts": {
+    "test": "mocha test/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ssmolkin1/nuf.git"
+  },
+  "keywords": [
+    "number",
+    "files",
+    "folder",
+    "renumber",
+    "re-number"
+  ],
+  "author": "Samuel Smolkin <sam@future-precedent.org>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/ssmolkin1/nuf/issues"
+  },
+  "homepage": "https://github.com/ssmolkin1/nuf#readme"
+}
