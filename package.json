@@ -4,7 +4,9 @@
   "description": "Number files in a folder ",
   "main": "index.js",
   "scripts": {
-    "test": "mocha test/"
+    "test": "mocha test/",
+    "lint": "eslint index.js src/",
+    "mtd": "node mktestdir.js"
   },
   "repository": {
     "type": "git",
@@ -22,5 +24,16 @@
   "bugs": {
     "url": "https://github.com/ssmolkin1/nuf/issues"
   },
-  "homepage": "https://github.com/ssmolkin1/nuf#readme"
+  "homepage": "https://github.com/ssmolkin1/nuf#readme",
+  "dependencies": {
+    "my-little-schemer": "^1.0.0",
+    "shelljs": "^0.7.8"
+  },
+  "devDependencies": {
+    "mocha": "^4.0.1",
+    "chai": "^4.1.2",
+    "eslint": "^4.12.1",
+    "eslint-config-airbnb-base": "^12.1.0",
+    "eslint-plugin-import": "^2.8.0"
+  }
 }
