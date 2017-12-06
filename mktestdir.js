@@ -7,15 +7,15 @@ const newDir = `${parent}/td${numExistDirs}`;
 
 sh.mkdir(newDir);
 
-// Create randomly numbered files with randomized common suffixes
-const suffs = ['docx', 'xlsx', 'doc', 'pdf', 'PDF', 'DOCX'];
+// Create randomly numbered files with randomized common files extensions
+const exts = ['docx', 'xlsx', 'doc', 'pdf', 'PDF', 'DOCX'];
 const files = [];
 const numFiles = 20;
 
 while (files.length < numFiles) {
   const rand = Math.floor(Math.random() * numFiles * 2) + 1;
-  const suff = suffs[rand % (suffs.length - 1)];
-  const file = `${newDir}/${rand}.${suff}`;
+  const ext = exts[rand % (exts.length - 1)];
+  const file = `${newDir}/${rand}.${ext}`;
 
   if (files.indexOf(file) === -1) {
     files.push(file);
@@ -33,8 +33,8 @@ const names = [
 ];
 
 names.forEach((name) => {
-  const suff = suffs[Math.floor(Math.random() * suffs.length)];
-  const file = `${newDir}/${name}.${suff}`;
+  const ext = exts[Math.floor(Math.random() * exts.length)];
+  const file = `${newDir}/${name}.${ext}`;
 
   files.push(file);
 });
