@@ -1,3 +1,5 @@
+#! /usr/bin/env node
+
 const { isNull, car, cdr, cons } = require('my-little-schemer');
 const sh = require('shelljs');
 
@@ -101,8 +103,8 @@ function add1File(name, index) {
   revOrig.push(addOrig);
 
   revDest.forEach((dest, i) => {
-    sh.mv(revOrig[i], dest);
-    // console.log(revOrig[i], dest);
+    // sh.mv(revOrig[i], dest);
+    console.log(revOrig[i], dest);
   });
 }
 
@@ -110,4 +112,4 @@ function add1File(name, index) {
 const args = process.argv.slice(2);
 
 // add1File(args[0], args[1]);
-console.log(__dirname);
+console.log(process.cwd());
