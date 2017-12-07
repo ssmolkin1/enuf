@@ -80,7 +80,7 @@ function add1File(name, index) {
 
     const nextN = currN + 1;
 
-    return cons(toPath(cons(nextN + 1, cdr(curr))), reNum(rest, nextN + 1));
+    return cons(toPath(cons(nextN, cdr(curr))), reNum(rest, nextN));
   }
 
   const destinations = reNum();
@@ -116,5 +116,5 @@ function add1File(name, index) {
 // Get args from CLI
 const args = process.argv.slice(2);
 
-// add1File(args[0], args[1]);
-// console.log(process.cwd());
+add1File(args[0], args[1]);
+console.log(numFiles);
