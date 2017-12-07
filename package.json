@@ -8,6 +8,9 @@
     "lint": "eslint index.js src/",
     "mtd": "node mktestdir.js"
   },
+  "bin": {
+    "nuf": "./index.js"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ssmolkin1/nuf.git"

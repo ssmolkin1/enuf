@@ -1,4 +1,11 @@
-const { isNull, car, cdr, cons } = require('my-little-schemer');
+#! /usr/bin/env node
+
+const {
+  isNull,
+  car,
+  cdr,
+  cons,
+} = require('my-little-schemer');
 const sh = require('shelljs');
 
 const cur = 0;
@@ -83,7 +90,7 @@ function add1File(name, index) {
   for (let i = 0; i < destinations.length; i += 1) {
     origins.push(toPath(mappedFiles[i]));
   }
-  
+
   // mv needs to be executed in reverse to avoid collisions
   let revDest = destinations.reverse();
   let revOrig = origins.reverse();
@@ -101,8 +108,8 @@ function add1File(name, index) {
   revOrig.push(addOrig);
 
   revDest.forEach((dest, i) => {
-    sh.mv(revOrig[i], dest);
-    // console.log(revOrig[i], dest);
+    // sh.mv(revOrig[i], dest);
+    console.log(revOrig[i], dest);
   });
 }
 
@@ -110,5 +117,4 @@ function add1File(name, index) {
 const args = process.argv.slice(2);
 
 // add1File(args[0], args[1]);
-
-console.log(__dirname);
+// console.log(process.cwd());
