@@ -50,7 +50,7 @@ const mappedFiles = numFiles.map((name) => {
   return [num, body, ext];
 });
 
-function add1File(name, index) {
+function add1File(name, index, preserveGaps = true) {
   const ext = getExt(name);
   const addOrig = `${dir}/${name}`;
   const addDest = `${dir}/${index}${ext}`;
@@ -70,51 +70,48 @@ function add1File(name, index) {
     const currN = car(curr);
     const rest = cdr(fileMap);
 
+    // PrevN is the number the last files was mapped to. It will be initilized to
+    // the index of the new file. Any files numbered below that index should be
+    // skipped.
     if (currN < prevN) {
       return reNum(rest, prevN, (orig, dest) => col(orig, dest));
     }
 
-    if (currN > prevN) {
+    // If you do not want to preserve gaps in existing numbering, then if currN is greater than
+    // prevN, the function should terminate.
+    if (!preserveGaps && currN > prevN) {
       return col([], []);
     }
 
     const nextN = currN + 1;
 
-    return cons(toPath(cons(nextN + 1, cdr(curr))), reNum(rest, nextN + 1));
+    // If currN is equal (or greater than, if you want to preserve gaps) prevN, then collect
+    // the path to the origin file and collect a mv destination that is one number up
+    return reNum(rest, nextN, (orig, dest) => col(
+      cons(toPath(curr), orig),
+      cons(toPath(cons(nextN, cdr(curr))), dest),
+    ));
   }
 
-  const destinations = reNum(mappedFiles, index, (orig, dest) => [orig, dest]);
-  const origins = [];
+  const mvMap = reNum(mappedFiles, index, (orig, dest) => {
+    orig.reverse().push(addOrig);
+    dest.reverse().push(addDest);
 
-  // Stop when origin length matches destination length
-  for (let i = 0; i < destinations.length; i += 1) {
-    origins.push(toPath(mappedFiles[i]));
-  }
+    return [orig, dest];
+  });
+  const origins = mvMap[0];
+  const destinations = mvMap[1];
 
-  // mv needs to be executed in reverse to avoid collisions
-  let revDest = destinations.reverse();
-  let revOrig = origins.reverse();
-
-  // Since the destination array was reversed, at a point there will just
-  // be a series of null entries. These need to be removed.
-  const end = revDest.indexOf(null);
-
-  revDest = revDest.slice(0, end);
-  revOrig = revOrig.slice(0, end);
-
-
-  // Now push the added file onto the end of the stack, to be executed last
-  revDest.push(addDest);
-  revOrig.push(addOrig);
-
-  revDest.forEach((dest, i) => {
-    // sh.mv(revOrig[i], dest);
-    console.log(revOrig[i], dest);
+  origins.forEach((orig, i) => {
+    // sh.mv(orig, destinations[i]);
+    console.log(orig, destinations[i]);
   });
 }
 
 // Get args from CLI
 const args = process.argv.slice(2);
 
-// add1File(args[0], args[1]);
-// console.log(process.cwd());
+
+
+console.log(numFiles);
+add1File(args[0], args[1], false);
