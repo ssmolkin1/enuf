@@ -110,4 +110,5 @@ function add1File(name, index) {
 const args = process.argv.slice(2);
 
 // add1File(args[0], args[1]);
+
 console.log(__dirname);
