@@ -61,9 +61,9 @@ function add1File(name, index) {
     return `${dir}/${fileName}`;
   }
 
-  function reNum(fileMap = mappedFiles, prevN = index) {
+  function reNum(fileMap, prevN, col) {
     if (isNull(fileMap)) {
-      return [];
+      return col([], []);
     }
 
     const curr = car(fileMap);
@@ -71,11 +71,11 @@ function add1File(name, index) {
     const rest = cdr(fileMap);
 
     if (currN < prevN) {
-      return cons(null, reNum(rest, prevN));
+      return reNum(rest, prevN, (orig, dest) => col(orig, dest));
     }
 
     if (currN > prevN) {
-      return [];
+      return col([], []);
     }
 
     const nextN = currN + 1;
@@ -83,7 +83,7 @@ function add1File(name, index) {
     return cons(toPath(cons(nextN + 1, cdr(curr))), reNum(rest, nextN + 1));
   }
 
-  const destinations = reNum();
+  const destinations = reNum(mappedFiles, index, (orig, dest) => [orig, dest]);
   const origins = [];
 
   // Stop when origin length matches destination length
