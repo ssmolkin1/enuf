@@ -1,5 +1,6 @@
 #! /usr/bin/env node
 
+const { lstatSync } = require('fs');
 const {
   isNull,
   car,
@@ -10,8 +11,9 @@ const sh = require('shelljs');
 const commandLineArgs = require('command-line-args');
 const commandLineCommands = require('command-line-commands');
 const getUsage = require('command-line-usage');
+const { version } = require('./package.json');
 
-/* Utilities */
+/* ----- Utilities ----- */
 
 // Determines whether the file is a numbered file
 function isNumbered(name) {
@@ -59,7 +61,11 @@ function parseFileName(name, num = getNum(name), body = getBody(name)) {
 
 // Get list of files in directory
 function getFiles(dir) {
-  return sh.ls(dir).slice(); // slice gets rid of extra stuff returned by sh.ls()
+  return sh.ls(dir)
+    // slice gets rid of extra stuff returned by sh.ls()
+    .slice()
+    // Filter out directories and 'index.[ext]' files.
+    .filter(file => lstatSync(`${dir}/${file}`).isFile() && !/^index\.[^.]*$/.test(file));
 }
 
 // Get sorted list of numbered files
@@ -90,7 +96,7 @@ function getParsedFileByIndex(dir, index) {
     }
   }
 
-  throw new Error(`File ${index} not found.`)
+  throw new Error(`File ${index} not found.`);
 }
 
 // Turn parsed filename into path
@@ -108,6 +114,18 @@ function move(origins, destinations) {
   });
 }
 
+function getIndicesFromArgs(args) {
+  const indices = [];
+
+  for (let i = 0; i < args.length; i += 1) {
+    if (!Number.isNaN(Number(args[i]))) {
+      indices.push(Number(args[i]));
+    }
+  }
+
+  return indices;
+}
+
 function readFile(path) {
   return sh.cat(path)
     .slice()
@@ -118,39 +136,12 @@ function readFile(path) {
     .split(/\s*[\n;,]+\s*/);
 }
 
-/* Commands */
-
-const validCommands = [null, 'add', 'remove', 'rm', 'shift', 'degap', 'move', 'mv', 'swap'];
-const {command, argv} = commandLineCommands(validCommands);
-
-const globalOptionDefinitions = [
-  {
-    name: 'directory',
-    alias: 'd',
-    type: String,
-    defaultValue: process.cwd(),
-    description: 'Choose working directory. Defaults to current working directory.',
-  },
-  {
-    name: 'file',
-    alias: 'f',
-    type: String,
-    multiple: true,
-    description: 'Import file names from file.',
-  },
-  {
-    name: 'keep-body',
-    alias: 'k',
-    type: Boolean,
-    defaultValue: false,
-    description: 'Append numbers to current filenames instead of overriting filenames with numbers.',
-  },
-];
+/* ----- Operations ----- */
 
 // Add one or more files to sequential indexes, starting from the given index.
 // Then, renumber each colliding file
 function addFiles(exportDir, workingDir, keepBody, index, ...names) {
-  if (Number.isNaN(index)) {
+  if (Number.isNaN(index) || index === undefined) {
     throw new SyntaxError('You did not indicate a file number.');
   }
 
@@ -194,7 +185,13 @@ function addFiles(exportDir, workingDir, keepBody, index, ...names) {
 
   // Files must be moved in reverse to avoid collision
   const mvMap = reNum(mappedFiles, index, index + (names.length - 1), (orig, dest) => {
-    const addOrig = names.map(name => `${exportDir}/${name}`);
+    const addOrig = names.map((name) => {
+      if (/^\//.test(name)) {
+        return name;
+      }
+
+      return `${exportDir}/${name}`;
+    });
     const addDest = names.map((name, i) => {
       if (keepBody) {
         return toPath(workingDir, parseFileName(name, index + i, ` - ${getBody(name)}`));
@@ -238,7 +235,7 @@ function rm(dir, del, startIndex, endIndex = startIndex) {
 }
 
 // Remove gaps in file numbers
-function degap(dir, startIndex, endIndex) {
+function degap(dir, startIndex = 1, endIndex) {
   if (Number.isNaN(startIndex)) {
     throw new SyntaxError('Missing start number');
   }
@@ -252,7 +249,7 @@ function degap(dir, startIndex, endIndex) {
     const currN = car(curr);
     const rest = cdr(fileMap);
 
-    // startIndex is where degapping starts.
+    // startIndex is where degapping starts. Defaults to 1.
     // Any files numbered below that index should be skipped.
     if (currN < startIndex) {
       return gapReNum(rest, prevN, (orig, dest) => col(orig, dest));
@@ -291,11 +288,11 @@ function degap(dir, startIndex, endIndex) {
 }
 
 function shift(dir, fromIndex, toIndex) {
-  if (Number.isNaN(fromIndex)) {
+  if (Number.isNaN(fromIndex) || fromIndex === undefined) {
     throw new SyntaxError('Missing from number');
   }
 
-  if (Number.isNaN(toIndex)) {
+  if (Number.isNaN(toIndex || toIndex === undefined)) {
     throw new SyntaxError('Missing to number');
   }
 
@@ -346,20 +343,40 @@ function shift(dir, fromIndex, toIndex) {
 }
 
 function mv(dir, fromIndex, toIndex) {
+  if (Number.isNaN(fromIndex) || fromIndex === undefined) {
+    throw new SyntaxError('Missing from number');
+  }
+
+  if (Number.isNaN(toIndex || toIndex === undefined)) {
+    throw new SyntaxError('Missing to number');
+  }
+
   const fromFile = getParsedFileByIndex(dir, fromIndex).join('');
 
   addFiles(dir, dir, true, toIndex, fromFile);
 }
 
 function swap(dir, firstIndex, secondIndex) {
+  if (Number.isNaN(firstIndex) || firstIndex === undefined) {
+    throw new SyntaxError('No files chosen.');
+  }
+
+  if (Number.isNaN(secondIndex || secondIndex === undefined)) {
+    throw new SyntaxError('Only one file chosen.');
+  }
+
   const firstFilePath = toPath(dir, getParsedFileByIndex(dir, firstIndex));
   const secondFilePath = toPath(dir, getParsedFileByIndex(dir, secondIndex));
   const tmpPath = `${dir}/.swaptmp`;
 
   // Giving a tmp pointer is required to avoid collision
-  sh.mv(firstFilePath, tmpPath);
-  sh.mv(secondFilePath, firstFilePath);
-  sh.mv(tmpPath, secondFilePath);
+  // sh.mv(firstFilePath, tmpPath);
+  // sh.mv(secondFilePath, firstFilePath);
+  // sh.mv(tmpPath, secondFilePath);
+
+  console.log(firstFilePath, tmpPath);
+  console.log(secondFilePath, firstFilePath);
+  console.log(tmpPath, secondFilePath);
 }
 
 // Removes all bodies from numbered filenames, leaving numbers only
@@ -375,17 +392,191 @@ function clean(dir) {
 function purge(dir) {
   getFiles(dir).forEach((file) => {
     if (!isNumbered(file)) {
-      sh.rm(`${dir}/file`);
+      // sh.rm(`${dir}/${file}`);
+      console.log(`${dir}/${file}`);
     }
   });
+}
+
+/* ----- CLI ----- */
+
+const validCommands = [
+  null,
+  'add',
+  'remove',
+  'rm',
+  'shift',
+  'degap',
+  'move',
+  'mv',
+  'swap',
+  'clean',
+  'purge',
+];
+
+const { command, argv } = commandLineCommands(validCommands);
+
+const globalOptionDefinitions = [
+  {
+    name: 'directory',
+    alias: 'd',
+    type: String,
+    defaultValue: process.cwd(),
+    description: 'Choose working directory. Default is current working directory.',
+  },
+  {
+    name: 'help',
+    alias: 'h',
+    type: Boolean,
+    description: 'Prints this help page.',
+  },
+];
+
+if (command === null) {
+  const specificOptionDefitions = [
+    {
+      name: 'version',
+      alias: 'v',
+      type: Boolean,
+      description: 'Prints the version of gal.',
+    },
+  ];
+
+  const optionDefinitions = globalOptionDefinitions
+    .slice(1)
+    .concat(specificOptionDefitions);
+
+  const options = commandLineArgs(optionDefinitions, { argv });
+
+  if (options.help) {
+    printHelpPage(command, optionDefinitions);
+  } else if (options.version) {
+    console.log(version);
+  }
+}
+
+if (command === 'add') {
+  const specificOptionDefitions = [
+    {
+      name: 'from-directory',
+      alias: 'e',
+      type: String,
+      description: 'Directory where files are being imported from. Default is the chosen working directory.',
+    },
+    {
+      name: 'keep-body',
+      alias: 'k',
+      type: Boolean,
+      description: 'Append numbers to current filenames instead of overriting filenames with numbers.',
+    },
+    {
+      name: 'file',
+      alias: 'f',
+      type: Boolean,
+      description: 'Import file names from file.',
+    },
+  ];
+
+  const optionDefinitions = globalOptionDefinitions.concat(specificOptionDefitions);
+
+  const options = commandLineArgs(optionDefinitions, { argv });
+
+  if (options.help) {
+    printHelpPage(command, optionDefinitions);
+  } else {
+    let number;
+    let index;
+
+    for (let i = 0; i < argv.length; i += 1) {
+      if (!Number.isNaN(Number(argv[i]))) {
+        number = Number(argv[i]);
+        index = i;
+        break;
+      }
+    }
+
+    if (number === undefined) {
+      throw new SyntaxError('You did not indicate a file number.');
+    }
+
+    let files = argv.slice(index + 1);
+
+    if (options.file) {
+      files = readFile(files);
+    }
+
+    addFiles(
+      options['from-directory'] || options.directory,
+      options.directory,
+      options['keep-body'],
+      number,
+      ...files,
+    );
+  }
+}
+
+if (command === 'remove' || command === 'rm') {
+  const specificOptionDefitions = [
+    {
+      name: 'delete',
+      alias: 'D',
+      type: Boolean,
+      description: 'Delete removed files instead of just de-numbering them.',
+    },
+  ];
+
+  const optionDefinitions = globalOptionDefinitions.concat(specificOptionDefitions);
+
+  const options = commandLineArgs(optionDefinitions, { argv });
+
+  if (options.help) {
+    printHelpPage(command, optionDefinitions);
+  } else {
+    rm(options.directory, options.delete, ...getIndicesFromArgs(argv));
+  }
+}
+
+if (
+  command === 'degap' ||
+  command === 'shift' ||
+  command === 'move' ||
+  command === 'mv' ||
+  command === 'swap' ||
+  command === 'clean' ||
+  command === 'purge'
+) {
+  const options = commandLineArgs(globalOptionDefinitions, { argv });
+
+  if (options.help) {
+    printHelpPage(command, optionDefinitions);
+  } else if (
+    command === 'clean' ||
+    command === 'purge'
+  ) {
+    const functions = {
+      clean,
+      purge,
+    };
+
+    functions[command](options.directory);
+  } else {
+    const functions = {
+      degap,
+      shift,
+      mv,
+      move: mv,
+      swap,
+    };
+
+    functions[command](options.directory, ...getIndicesFromArgs(argv));
+  }
 }
 
 // Get args from CLI
 const args = process.argv.slice(2);
 
 // console.log(getParsedFiles(getNumFiles(getFiles(process.cwd()))));
-addFiles(process.cwd(), process.cwd(), false, parseInt(args[0], 10), ...args.slice(1));
+// addFiles(process.cwd(), process.cwd(), false, parseInt(args[0], 10), ...args.slice(1));
 // rm(process.cwd(), false, parseInt(args[0], 10), parseInt(args[1], 10));
 // degap(process.cwd(), parseInt(args[0], 10), parseInt(args[1], 10));
 // shift(process.cwd(), parseInt(args[0], 10), parseInt(args[1], 10));
-
