@@ -29,6 +29,9 @@
   },
   "homepage": "https://github.com/ssmolkin1/nuf#readme",
   "dependencies": {
+    "command-line-args": "^4.0.7",
+    "command-line-commands": "^2.0.1",
+    "command-line-usage": "^4.0.2",
     "my-little-schemer": "^1.0.0",
     "shelljs": "^0.7.8"
   },
