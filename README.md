@@ -6,6 +6,8 @@ From the command line:
 ```
 $ npm i -g enuf 
 ```
+
+Or, on Windows x64, you can [download the pre-built executable by clicking this link](./enuf.exe).
 ## Usage
 From the command line:
 ```
