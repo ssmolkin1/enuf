@@ -116,7 +116,7 @@ function getParsedFileByIndex(dir, index) {
 function toPath(dir, parsedFileName) {
   const fileName = parsedFileName.join('');
 
-  return path.resolve(dir, fileName)
+  return path.resolve(dir, fileName);
 }
 
 // move files from origin array to paths given in destination array
@@ -139,8 +139,8 @@ function getIndicesFromArgs(args) {
 }
 
 // Read file of filenames
-function readFile(path) {
-  return sh.cat(path)
+function readFile(file) {
+  return sh.cat(file)
     .slice()
     // get rid of trailing separator chars
     .replace(/\s*[\n;,]+\s*$/g, '')
@@ -526,8 +526,12 @@ function purge(dir) {
   });
 }
 
-function ls(dir) {
-  console.log(getFileNumbers(dir).join(', '));
+function ls(dir, full) {
+  if (full) {
+    console.log(getNumFiles(getFiles(dir)));
+  } else{
+    console.log(getFileNumbers(dir).join(', '));
+  }
 }
 
 /* ----- CLI ----- */
@@ -706,10 +710,10 @@ if (command === null) {
 if (command === 'add') {
   const specificOptionDefitions = [
     {
-      name: 'from-directory',
+      name: 'export-directory',
       alias: 'e',
       type: String,
-      description: 'Directory where files are being imported from. Default is the chosen working directory.',
+      description: 'Directory where files are being exported from. Default is the chosen working directory.',
     },
     {
       name: 'keep-body',
@@ -722,6 +726,12 @@ if (command === 'add') {
       alias: 'f',
       type: Boolean,
       description: 'Import file names from file.',
+    },
+    {
+      name: 'all',
+      alias: 'a',
+      type: Boolean,
+      description: `Works in conjunction with the --export-directory|-e option. Import all files in given export directory. No effect if an export directory is not provided. Non-recursive (won't look in sub-directories).`,
     },
   ];
 
@@ -753,8 +763,12 @@ if (command === 'add') {
       files = readFile(files);
     }
 
+    if (options['export-directory'] && options.all) {
+      files = getFiles(options['export-directory']);
+    }
+
     addFiles(
-      options['from-directory'] || options.directory,
+      options['export-directory'] || options.directory,
       options.directory,
       options['keep-body'],
       number,
@@ -805,6 +819,26 @@ if (command === 'reconcile' || command === 'r') {
   }
 }
 
+if (command === 'list' || command === 'ls') {
+  const specificOptionDefitions = [
+    {
+      name: 'full',
+      alias: 'f',
+      type: Boolean,
+      description: 'Displays names of numbered files, instead of just numbers.',
+    },
+  ];
+
+  const optionDefinitions = globalOptionDefinitions.concat(specificOptionDefitions);
+
+  const options = commandLineArgs(optionDefinitions, { argv });
+
+  if (options.help) {
+    printHelpPage(command, optionDefinitions);
+  } else {
+    ls(options.directory, options.full);
+  }
+}
 if (
   command === 'degap' ||
   command === 'shift' ||
@@ -812,18 +846,14 @@ if (
   command === 'mv' ||
   command === 'swap' ||
   command === 'clean' ||
-  command === 'purge' ||
-  command === 'list' ||
-  command === 'ls'
+  command === 'purge'
 ) {
   const options = commandLineArgs(globalOptionDefinitions, { argv });
 
   if (options.help) {
     printHelpPage(command, globalOptionDefinitions);
   } else if (
-    command === 'purge' ||
-    command === 'list' ||
-    command === 'ls'
+    command === 'purge'
   ) {
     const functions = {
       purge,

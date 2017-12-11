@@ -5,7 +5,7 @@ const parent = `${__dirname}/test/scratch/test_dirs`;
 const numExistDirs = sh.ls(parent).length;
 const newDir = `${parent}/td${numExistDirs}`;
 
-sh.mkdir(newDir);
+sh.mkdir('-p',newDir);
 
 // Create randomly numbered files with randomized common files extensions
 const exts = ['docx', 'xlsx', 'doc', 'pdf', 'PDF', 'DOCX'];
