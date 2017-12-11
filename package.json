@@ -1,6 +1,6 @@
 {
   "name": "enuf",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "The quicker, easier way to deal with numbered files. The bibling lawyer's dream come true.",
   "main": "index.js",
   "scripts": {
