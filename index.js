@@ -11,7 +11,7 @@ const sh = require('shelljs');
 const commandLineArgs = require('command-line-args');
 const commandLineCommands = require('command-line-commands');
 const getUsage = require('command-line-usage');
-const { version } = require('./package.json');
+const pkg = require('./package.json');
 
 /* ----- Utilities ----- */
 
@@ -32,7 +32,13 @@ function getNum(name) {
 
 // Extract the extension (with dot) from a filename
 function getExt(name) {
-  return /\.[^.]*$/.exec(name)[0];
+  const extMatches = /\.[^.]*$/.exec(name);
+
+  if (extMatches) {
+    return extMatches[0];
+  }
+
+  return '';
 }
 
 // Extracts body of filename (i.e., what is between number and extension)
@@ -85,6 +91,11 @@ function getParsedNumFiles(dir) {
   return getParsedFiles(getNumFiles(getFiles(dir)));
 }
 
+// Get file numbers of all numbered files
+function getFileNumbers(dir) {
+  return getParsedNumFiles(dir).map(parsedFile => car(parsedFile));
+}
+
 // Get parsed file by index
 function getParsedFileByIndex(dir, index) {
   const parsedNumFiles = getParsedNumFiles(dir);
@@ -109,8 +120,7 @@ function toPath(dir, parsedFileName) {
 // move files from origin array to paths given in destination array
 function move(origins, destinations) {
   origins.forEach((orig, i) => {
-    // sh.mv(orig, destinations[i]);
-    console.log([orig, destinations[i]]);
+    sh.mv(orig, destinations[i]);
   });
 }
 
@@ -185,16 +195,30 @@ function addFiles(exportDir, workingDir, keepBody, index, ...names) {
 
   // Files must be moved in reverse to avoid collision
   const mvMap = reNum(mappedFiles, index, index + (names.length - 1), (orig, dest) => {
+    const PathRegExp = /^(\.{0,2}\/)+/;
+
     const addOrig = names.map((name) => {
-      if (/^\//.test(name)) {
+      // Handle a path being given rather than a filename
+      if (PathRegExp.test(name)) {
         return name;
       }
 
       return `${exportDir}/${name}`;
     });
+
     const addDest = names.map((name, i) => {
       if (keepBody) {
-        return toPath(workingDir, parseFileName(name, index + i, ` - ${getBody(name)}`));
+        // Extract filename from path if path is given
+        const fileName = name.replace(PathRegExp, '');
+        const body = getBody(fileName);
+
+        if (body) {
+          return toPath(workingDir, parseFileName(
+            fileName,
+            index + i,
+            /^\s*-/.test(body) ? body : ` - ${body}`,
+          ));
+        }
       }
 
       return toPath(workingDir, parseFileName(name, index + i, ''));
@@ -218,14 +242,13 @@ function rm(dir, del, startIndex, endIndex = startIndex) {
 
   // Either delete or denumber the files to be removed.
   if (del) {
-    // sh.rm(pathsToRm);
-    console.log(pathsToRm);
+    sh.rm(pathsToRm);
   } else {
     // Create denumbered paths. Given them a body if the body is blank
     const denumberedPaths = filesToRm.map((parsedFile, i) => toPath(dir, cons(
       '',
       cons(
-        car(cdr(parsedFile)) || `removed-file-${i + 1}`,
+        car(cdr(parsedFile)).replace(/^[\s-]+/, '') || `removed-file-${i + 1}-${Math.random()}`,
         cdr(cdr(parsedFile)),
       ),
     )));
@@ -235,7 +258,7 @@ function rm(dir, del, startIndex, endIndex = startIndex) {
 }
 
 // Remove gaps in file numbers
-function degap(dir, startIndex = 1, endIndex) {
+function degap(dir, startIndex = 0, endIndex) {
   if (Number.isNaN(startIndex)) {
     throw new SyntaxError('Missing start number');
   }
@@ -249,7 +272,7 @@ function degap(dir, startIndex = 1, endIndex) {
     const currN = car(curr);
     const rest = cdr(fileMap);
 
-    // startIndex is where degapping starts. Defaults to 1.
+    // startIndex is where degapping starts. Defaults to 0.
     // Any files numbered below that index should be skipped.
     if (currN < startIndex) {
       return gapReNum(rest, prevN, (orig, dest) => col(orig, dest));
@@ -365,40 +388,238 @@ function swap(dir, firstIndex, secondIndex) {
     throw new SyntaxError('Only one file chosen.');
   }
 
-  const firstFilePath = toPath(dir, getParsedFileByIndex(dir, firstIndex));
-  const secondFilePath = toPath(dir, getParsedFileByIndex(dir, secondIndex));
+  const firstFile = getParsedFileByIndex(dir, firstIndex);
+  const secondFile = getParsedFileByIndex(dir, secondIndex);
+
+  const newFirstFile = secondFile.slice(1);
+  newFirstFile.unshift(firstFile[0]);
+
+  const newSecondFile = firstFile.slice(1);
+  newSecondFile.unshift(secondFile[0]);
+
+  const firstFilePath = toPath(dir, firstFile);
+  const secondFilePath = toPath(dir, secondFile);
+
+  const newFirstFilePath = toPath(dir, newFirstFile);
+  const newSecondFilePath = toPath(dir, newSecondFile);
+
   const tmpPath = `${dir}/.swaptmp`;
 
-  // Giving a tmp pointer is required to avoid collision
-  // sh.mv(firstFilePath, tmpPath);
-  // sh.mv(secondFilePath, firstFilePath);
-  // sh.mv(tmpPath, secondFilePath);
-
-  console.log(firstFilePath, tmpPath);
-  console.log(secondFilePath, firstFilePath);
-  console.log(tmpPath, secondFilePath);
+  // Giving a tmp pointer is required to avoid collision if exts are same
+  sh.mv(firstFilePath, tmpPath);
+  sh.mv(secondFilePath, newFirstFilePath);
+  sh.mv(tmpPath, newSecondFilePath);
 }
 
 // Removes all bodies from numbered filenames, leaving numbers only
-function clean(dir) {
-  const parsedNumFiles = getParsedNumFiles(dir);
-  const origins = parsedNumFiles.map(parsedFile => toPath(dir, parsedFile));
-  const destinations = parsedNumFiles.map(parsedFile => toPath(dir, [parsedFile[0], '', parsedFile[2]]));
+function clean(dir, startIndex = 0, endIndex) {
+  if (Number.isNaN(startIndex)) {
+    throw new SyntaxError('Missing start number');
+  }
+
+  function rmBod(fileMap, col) {
+    if (isNull(fileMap)) {
+      return col([], []);
+    }
+
+    const curr = car(fileMap);
+    const currN = car(curr);
+    const currB = car(cdr(curr));
+    const rest = cdr(fileMap);
+
+    // startIndex is where cleaning starts. Defaults to 0.
+    // Any files numbered below that index should be skipped.
+    // Filenames without bodies should also be skipped.
+    if (currN < startIndex || !currB) {
+      return rmBod(rest, (orig, dest) => col(orig, dest));
+    }
+
+    // endIndex is where cleaning ends. Function terminates
+    // when past that index, if one is given
+    if (endIndex && currN > endIndex) {
+      return col([], []);
+    }
+
+    // If file num is between startIndex and endIndex, collect the path to the origin file and
+    // collect a mv destination that is the filename without the body
+    return rmBod(rest, (orig, dest) => col(
+      cons(toPath(dir, curr), orig),
+      cons(toPath(dir, cons(currN, cons('', cdr(cdr(curr))))), dest),
+    ));
+  }
+
+  const mappedFiles = getParsedNumFiles(dir);
+
+  // Since no renumbering, mv order doesn't matter.
+  const mvMap = rmBod(mappedFiles, (orig, dest) => [orig, dest]);
+
+  const origins = mvMap[0];
+  const destinations = mvMap[1];
 
   move(origins, destinations);
+}
+
+// Reconciles all files with colliding numbers
+function reconcile(dir, infoOnly, startN = 0, endN) {
+  if (Number.isNaN(startN)) {
+    throw new SyntaxError('Missing start number');
+  }
+
+  const parsedNumFiles = getParsedNumFiles(dir);
+  const collisions = [];
+
+  for (let i = 1; i < parsedNumFiles.length; i += 1) {
+    const curr = parsedNumFiles[i];
+    const currN = curr[0];
+
+    if (
+      currN >= startN &&
+      (endN ? currN <= endN : true) &&
+      currN === parsedNumFiles[i - 1][0]
+    ) {
+      if (infoOnly) {
+        collisions.push(currN);
+      } else {
+        addFiles(dir, dir, true, currN + 1, curr.join(''));
+        reconcile(dir, infoOnly, currN, endN);
+        break;
+      }
+    }
+  }
+
+  if (infoOnly) {
+    console.log(collisions.length ?
+      `The following files need reconciliation: ${collisions.join(', ')}` :
+      'All files are reconciled.');
+  }
 }
 
 // Removes all unnumbered files from directory
 function purge(dir) {
   getFiles(dir).forEach((file) => {
     if (!isNumbered(file)) {
-      // sh.rm(`${dir}/${file}`);
-      console.log(`${dir}/${file}`);
+      sh.rm(`${dir}/${file}`);
     }
   });
 }
 
+function ls(dir) {
+  console.log(getFileNumbers(dir).join(', '));
+}
+
 /* ----- CLI ----- */
+
+/* --- Generate Help Page --- */
+
+// Helper function to generate help page
+function printHelpPage(command, optionDefinitions) {
+  const commandList = {
+    list: {
+      name: 'list, ls',
+      description: 'Show all used indicies.',
+    },
+    ls: {
+      name: 'list, ls',
+      description: 'Show all used indicies.',
+    },
+    add: {
+      name: 'add',
+      summary: 'Insert one or more files into a numbered file directory, starting from the given index.',
+    },
+    remove: {
+      name: 'remove, rm',
+      summary: 'Remove one or more files by index.',
+    },
+    rm: {
+      name: 'remove, rm',
+      summary: 'Remove one or more files by index.',
+    },
+    shift: {
+      name: 'shift',
+      description: 'Move a numbered file to a new index, move all subsequent files to subsequnet indices.',
+    },
+    degap: {
+      name: 'degap',
+      description: 'Remove gaps in numbering.',
+    },
+    move: {
+      name: 'move, mv',
+      description: 'Move file from one index to a new index.',
+    },
+    mv: {
+      name: 'move, mv',
+      description: 'Move file from one index to a new index.',
+    },
+    swap: {
+      name: 'swap',
+      description: 'Swap the indices of two files.',
+    },
+    reconcile: {
+      name: 'reconcile, r',
+      description: `Where multiple files share an index (possible if files have different bodies or extensions)
+        renumber files so that each file has a unique index.`,
+    },
+    r: {
+      name: 'reconcile, r',
+      description: `Where multiple files share an index (possible if files have different bodies or extensions)
+        renumber files so that each file has a unique index.`,
+    },
+    clean: {
+      name: 'clean',
+      description: 'Remove bodies from filenames, leaving only the index and extension.',
+    },
+    purge: {
+      name: 'purge',
+      description: `Delete all non-numbered files in the working directory, other than the file titled
+      'index.<ext>'.`,
+    },
+  };
+
+  const sections = [ // Universal template
+    {
+      header: `Usage: enuf ${command ? `${command}` : '<command>'}  <options>  ${(command !== null &&
+          command !== 'purge' &&
+          command !== 'list' &&
+          command !== 'ls') ? '<index>' : ''} ${(command !== null &&
+              command !== 'purge' &&
+              command !== 'list' &&
+              command !== 'ls' &&
+              command !== 'add') ? ' <index2>' : ''} ${command === 'add' ? '<files>' : ''}`,
+      content: `${commandList[command] ? `${commandList[command].summary} ` : ''} If the command takes indiceis, options declarations must always precede the indicies. If the commend takes files, these should always come last, after the options and index.`,
+    },
+    {
+      header: 'Options',
+      optionList: optionDefinitions,
+    },
+    {
+      content: `See 'enuf <command> -h' for help with ${command ? 'another command or \'enuf -h\' for a full list of commands.' : 'a specific command.'}`,
+    },
+  ];
+
+  if (!command) { // Show title and command list only for 'enuf -h'
+    sections.unshift({
+      header: pkg.name,
+      content: pkg.description,
+    });
+
+    const commandDescriptions = Object.values(commandList).filter((a, i, arr) => {
+      if (i > 0) {
+        return a.name !== arr[i - 1].name;
+      }
+
+      return true;
+    });
+
+    sections.splice(sections.length - 1, 0, {
+      header: 'Command List',
+      content: commandDescriptions,
+    });
+  }
+
+  console.log(getUsage(sections));
+}
+
+/* ----- Commands ----- */
 
 const validCommands = [
   null,
@@ -410,8 +631,12 @@ const validCommands = [
   'move',
   'mv',
   'swap',
+  'reconcile',
+  'r',
   'clean',
   'purge',
+  'list',
+  'ls',
 ];
 
 const { command, argv } = commandLineCommands(validCommands);
@@ -451,7 +676,7 @@ if (command === null) {
   if (options.help) {
     printHelpPage(command, optionDefinitions);
   } else if (options.version) {
-    console.log(version);
+    console.log(pkg.version);
   }
 }
 
@@ -536,6 +761,27 @@ if (command === 'remove' || command === 'rm') {
   }
 }
 
+if (command === 'reconcile' || command === 'r') {
+  const specificOptionDefitions = [
+    {
+      name: 'info-only',
+      alias: 'i',
+      type: Boolean,
+      description: 'Displays file numbers which need reconciliation, but does not re-number files.',
+    },
+  ];
+
+  const optionDefinitions = globalOptionDefinitions.concat(specificOptionDefitions);
+
+  const options = commandLineArgs(optionDefinitions, { argv });
+
+  if (options.help) {
+    printHelpPage(command, optionDefinitions);
+  } else {
+    reconcile(options.directory, options['info-only'], ...getIndicesFromArgs(argv));
+  }
+}
+
 if (
   command === 'degap' ||
   command === 'shift' ||
@@ -543,19 +789,23 @@ if (
   command === 'mv' ||
   command === 'swap' ||
   command === 'clean' ||
-  command === 'purge'
+  command === 'purge' ||
+  command === 'list' ||
+  command === 'ls'
 ) {
   const options = commandLineArgs(globalOptionDefinitions, { argv });
 
   if (options.help) {
-    printHelpPage(command, optionDefinitions);
+    printHelpPage(command, globalOptionDefinitions);
   } else if (
-    command === 'clean' ||
-    command === 'purge'
+    command === 'purge' ||
+    command === 'list' ||
+    command === 'ls'
   ) {
     const functions = {
-      clean,
       purge,
+      ls,
+      list: ls,
     };
 
     functions[command](options.directory);
@@ -566,17 +816,9 @@ if (
       mv,
       move: mv,
       swap,
+      clean,
     };
 
     functions[command](options.directory, ...getIndicesFromArgs(argv));
   }
 }
-
-// Get args from CLI
-const args = process.argv.slice(2);
-
-// console.log(getParsedFiles(getNumFiles(getFiles(process.cwd()))));
-// addFiles(process.cwd(), process.cwd(), false, parseInt(args[0], 10), ...args.slice(1));
-// rm(process.cwd(), false, parseInt(args[0], 10), parseInt(args[1], 10));
-// degap(process.cwd(), parseInt(args[0], 10), parseInt(args[1], 10));
-// shift(process.cwd(), parseInt(args[0], 10), parseInt(args[1], 10));

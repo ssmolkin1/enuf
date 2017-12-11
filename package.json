@@ -1,7 +1,7 @@
 {
-  "name": "nuf",
+  "name": "enuf",
   "version": "1.0.0",
-  "description": "Number files in a folder ",
+  "description": "The quicker, easier way to deal with numbered files. The bibling lawyer's dream come true.",
   "main": "index.js",
   "scripts": {
     "test": "mocha test/",
@@ -9,25 +9,30 @@
     "mtd": "node mktestdir.js"
   },
   "bin": {
-    "nuf": "./index.js"
+    "enuf": "./index.js"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ssmolkin1/nuf.git"
+    "url": "git+https://github.com/ssmolkin1/enuf.git"
   },
   "keywords": [
     "number",
     "files",
     "folder",
     "renumber",
-    "re-number"
+    "re-number",
+    "law",
+    "lawyer",
+    "bible",
+    "binder",
+    "closing"
   ],
   "author": "Samuel Smolkin <sam@future-precedent.org>",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/ssmolkin1/nuf/issues"
+    "url": "https://github.com/ssmolkin1/enuf/issues"
   },
-  "homepage": "https://github.com/ssmolkin1/nuf#readme",
+  "homepage": "https://github.com/ssmolkin1/enuf#readme",
   "dependencies": {
     "command-line-args": "^4.0.7",
     "command-line-commands": "^2.0.1",
