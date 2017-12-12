@@ -7,7 +7,7 @@ From the command line:
 $ npm i -g enuf 
 ```
 
-Or, on Windows, you can [download the 64-bit executable by clicking this link](./enuf.exe). Make sure you save it in a folder in your [path](https://www.computerhope.com/issues/ch000549.htm).
+Or, on Windows, you can [download the 64-bit executable by clicking this link](./enuf.exe). Make sure you save it in a folder in your [path](https://www.computerhope.com/issues/ch000549.htm) (on most Windows 10 installations, saving it in the folder %USERPROFILE%\AppData\Local\Microsoft\WindowsApps will work).
 ## Usage
 From the command line:
 ```
