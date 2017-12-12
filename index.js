@@ -526,6 +526,7 @@ function purge(dir) {
   });
 }
 
+// List numbers of used files 
 function ls(dir, full) {
   if (full) {
     console.log(getNumFiles(getFiles(dir)));
@@ -534,6 +535,37 @@ function ls(dir, full) {
   }
 }
 
+// Gets rid of leading zeros
+function init(dir) {
+  getFiles(dir).forEach(name => {
+    if (/^0/.test(name)) {
+      sh.mv(path.resolve(dir, name), path.resolve(dir, name.replace(/^0+(\d+)/, '$1')));
+    }
+  })
+}
+
+// Add lead zeros
+function zeros(dir, n) {
+  if (!n) {
+    throw new Error('Please specify how many lead zeros to add.')
+  }
+
+  getNumFiles(getFiles(dir)).forEach(name => {
+    const nNums = /^\d+/.exec(name)[0].length;
+    
+    if (nNums < n) {
+      let newName = name;
+      
+      for (let i = 0; i < n - nNums; i += 1) {
+        newName = '0' + newName;
+      }
+
+      sh.mv(path.resolve(dir, name), path.resolve(dir, newName));
+    }
+  });
+}
+
+
 /* ----- CLI ----- */
 
 /* --- Generate Help Page --- */
@@ -541,6 +573,10 @@ function ls(dir, full) {
 // Helper function to generate help page
 function printHelpPage(command, optionDefinitions) {
   const commandList = {
+    init: {
+      name: 'init',
+      description: 'Initializes a directory for use with enuf by getting rid of any file numbers with lead zeros.',
+    },
     list: {
       name: 'list, ls',
       description: 'Show all used indices.',
@@ -551,15 +587,15 @@ function printHelpPage(command, optionDefinitions) {
     },
     add: {
       name: 'add',
-      summary: 'Insert one or more files into a numbered file directory, starting from the given index.',
+      description:'Insert one or more files into a numbered file directory, starting from the given index.',
     },
     remove: {
       name: 'remove, rm',
-      summary: 'Remove one or more files by index.',
+      description:'Remove one or more files by index.',
     },
     rm: {
       name: 'remove, rm',
-      summary: 'Remove one or more files by index.',
+      description: 'Remove one or more files by index.',
     },
     shift: {
       name: 'shift',
@@ -595,10 +631,17 @@ function printHelpPage(command, optionDefinitions) {
       name: 'clean',
       description: 'Remove bodies from filenames, leaving only the index and extension.',
     },
+    length: {
+      name: 'length, l',
+      description: 'Add lead zeros to filenames to get a minimum files number length.',
+    },
+    l: {
+      name: 'length, l',
+      description: 'Add lead zeros to filenames to get a minimum files number length.',
+    },
     purge: {
       name: 'purge',
-      description: `Delete all non-numbered files in the working directory, other than the file titled
-      'index.<ext>'.`,
+      description: `Delete all non-numbered files in the working directory, other than the file titled 'index.<ext>'.`,
     },
   };
 
@@ -607,12 +650,18 @@ function printHelpPage(command, optionDefinitions) {
       header: `Usage: enuf ${command ? `${command}` : '<command>'}  <options>  ${(command !== null &&
           command !== 'purge' &&
           command !== 'list' &&
-          command !== 'ls') ? '<index>' : ''} ${(command !== null &&
+          command !== 'ls' && 
+          command !== 'length' &&
+          command !== 'l' && 
+          command !== 'init') ? '<index>' : ''} ${(command === 'length' || command == 'l') ? '<length>' : ''} ${(command !== null &&
               command !== 'purge' &&
               command !== 'list' &&
               command !== 'ls' &&
+              command !== 'length' &&
+              command !== 'l' && 
+              command !== 'init' &&
               command !== 'add') ? ' <index2>' : ''} ${command === 'add' ? '<files>' : ''}`,
-      content: `${commandList[command] ? `${commandList[command].summary} ` : ''} If the command takes indices, options declarations must always precede the indices. If the commend takes files, these should always come last, after the options and index.`,
+      content: `${commandList[command] ? `${commandList[command].description} ` : ''} If the command takes indices, options declarations must always precede the indices. If the command takes files, these should always come last, after the options and index.`,
     },
     {
       header: 'Options',
@@ -650,6 +699,9 @@ function printHelpPage(command, optionDefinitions) {
 
 const validCommands = [
   null,
+  'init',
+  'list',
+  'ls',
   'add',
   'remove',
   'rm',
@@ -661,9 +713,9 @@ const validCommands = [
   'reconcile',
   'r',
   'clean',
+  'length',
+  'l',
   'purge',
-  'list',
-  'ls',
 ];
 
 const { command, argv } = commandLineCommands(validCommands);
@@ -846,19 +898,22 @@ if (
   command === 'mv' ||
   command === 'swap' ||
   command === 'clean' ||
-  command === 'purge'
+  command === 'purge' ||
+  command === 'length' ||
+  command === 'l' ||
+  command === 'init'
 ) {
   const options = commandLineArgs(globalOptionDefinitions, { argv });
 
   if (options.help) {
     printHelpPage(command, globalOptionDefinitions);
   } else if (
-    command === 'purge'
+    command === 'purge' ||
+    command === 'init'    
   ) {
     const functions = {
       purge,
-      ls,
-      list: ls,
+      init,
     };
 
     functions[command](options.directory);
@@ -870,6 +925,8 @@ if (
       move: mv,
       swap,
       clean,
+      length: zeros,
+      l: zeros,
     };
 
     functions[command](options.directory, ...getIndicesFromArgs(argv));
