@@ -39,7 +39,7 @@
     "command-line-commands": "^2.0.1",
     "command-line-usage": "^4.0.2",
     "my-little-schemer": "^1.0.0",
-    "shelljs": "^0.7.8"
+    "shelljs": "^0.8.5"
   },
   "devDependencies": {
     "chai": "^4.2.0",
